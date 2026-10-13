@@ -28,6 +28,7 @@
           - cordis_inspect_query
           - load_workspace_dependencies
         optionalTools:
+          #some tool that is non-official but useful for you can add it to here
           dsh-ops:
             - ops_glob
             - ops_grep

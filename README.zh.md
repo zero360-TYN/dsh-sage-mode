@@ -51,10 +51,6 @@
 - **装了 dsh-ops** → 这些工具被纳入白名单，保持可用。
 - **没装 dsh-ops** → 名字被忽略，其余功能完全不受影响。可选依赖缺失**从不算错误**。
 
-这是刻意的设计：这些包里**没有任何一个提供 Cordis 服务**，所以 `inject` 无法表达「dsh-ops 存在」——
-去等一个并不存在的服务，只会让插件静默失效。真正可观测的事实是**已注册的工具名**，
-因此插件在模式启用时按 agent 解析它们，并记录找到了哪些 provider。
-
 想引入其它 bundle 的只读工具，扩展这张表即可，无需改代码：
 
 ```yaml
@@ -75,6 +71,8 @@ config:
 ```
 https://github.com/zero360-TYN/dsh-sage-mode
 ```
+
+![pic_location: /readme_pic/install.png](/readme_pic/install.png)
 
 管理器会把 GitHub 仓库 URL 识别为 git 安装类型，克隆该包、加入 `sage-mode` 行并激活。
 以后更新就是重新填一次同样的 URL；新的 JavaScript 模块代际需要重启应用才会加载。

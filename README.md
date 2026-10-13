@@ -58,10 +58,6 @@ as an **optional dependency** (`optionalTools` in [`cordis.patch.yml`](cordis.pa
 - **dsh-ops absent** → the names are ignored and everything else keeps working. A missing
   optional provider is never an error.
 
-This is deliberate: no package in this list provides a Cordis *service*, so `inject` cannot
-express "dsh-ops is present" — waiting on a service that does not exist would silently
-deactivate the plugin. The registered tool names are the observable fact, so the plugin
-resolves them per agent when the mode is engaged, and logs which providers were found.
 
 To adopt a read-only tool from any other bundle, extend the map without touching the code:
 
@@ -83,7 +79,7 @@ Open **Plugin Manager** in the Harness and enter this repository's URL as the in
 ```
 https://github.com/zero360-TYN/dsh-sage-mode
 ```
-
+![pic_location: /readme_pic/install.png](/readme_pic/install.png)
 The manager reads a GitHub repository URL as a git install spec, clones the package, adds its
 `sage-mode` row, and activates it. Updating later means installing the same URL again; a fresh
 JavaScript module generation needs an app restart to load.
