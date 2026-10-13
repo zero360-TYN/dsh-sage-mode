@@ -36,7 +36,7 @@ const DEFAULT_SECTION_ORDER = 3255
 /** PTC mode's presentation transport is never restrictable, so the guard admits it. */
 const PTC_TRANSPORT = 'run_code'
 /** Accepted config keys; anything else fails at load instead of being ignored. */
-const CONFIG_KEYS = new Set(['command', 'section', 'sectionOrder', 'allowedTools'])
+const CONFIG_KEYS = new Set(['command', 'section', 'sectionOrder', 'allowedTools', 'optionalTools'])
 
 /**
  * Tools that stay visible in Sage mode: reading, searching, web, plus the
@@ -52,18 +52,34 @@ const DEFAULT_ALLOWED_TOOLS = Object.freeze([
   'web_fetch',
   'ask_user_question',
   'skill',
-  'ops_glob',
-  'ops_grep',
-  'ops_inspect_local_file',
   'cordis_inspect_list',
   'cordis_inspect_query',
   'load_workspace_dependencies',
 ])
 
 /**
- * Fallback mask for a composition where none of {@link DEFAULT_ALLOWED_TOOLS}
- * is visible (an unusual preset): deny the known mutators instead, so an
- * unrecognized read-only tool is not hidden along with everything else.
+ * Read-only tools contributed by other bundles, keyed by the plugin that owns
+ * them. Each entry is an *optional* dependency: the tools join the allow list
+ * only while that owner is actually mounted, and a missing owner is not an
+ * error. This is the whole dependency mechanism — none of these packages
+ * provides a Cordis service, so `inject` cannot be used to mean "this bundle
+ * is present"; the registered tool names are the observable fact.
+ *
+ * Extend it with `config.optionalTools` to adopt a read-only tool from any
+ * other bundle without editing this file.
+ */
+const OPTIONAL_TOOL_PROVIDERS = Object.freeze({
+  'dsh-ops': Object.freeze([
+    'ops_glob',
+    'ops_grep',
+    'ops_inspect_local_file',
+  ]),
+})
+
+/**
+ * Fallback mask for a composition where none of the allowed tools is visible
+ * (an unusual preset): deny the known mutators instead, so an unrecognized
+ * read-only tool is not hidden along with everything else.
  */
 const FALLBACK_DENIED_TOOLS = Object.freeze([
   'write',
@@ -110,11 +126,11 @@ Format for a chat reply: short paragraphs, lists, and fenced code blocks. Reply 
 function resolveConfig(raw) {
   const config = raw ?? {}
   if (config === null || typeof config !== 'object' || Array.isArray(config)) {
-    throw new Error('sage-mode: config must be a mapping of { command, section, sectionOrder, allowedTools }')
+    throw new Error('sage-mode: config must be a mapping of { command, section, sectionOrder, allowedTools, optionalTools }')
   }
   const unknown = Object.keys(config).filter((key) => !CONFIG_KEYS.has(key))
   if (unknown.length > 0) {
-    throw new Error(`sage-mode: unknown config key(s) ${unknown.join(', ')} — config is { command, section, sectionOrder, allowedTools }`)
+    throw new Error(`sage-mode: unknown config key(s) ${unknown.join(', ')} — config is { command, section, sectionOrder, allowedTools, optionalTools }`)
   }
   const command = typeof config.command === 'string' && config.command.trim() !== ''
     ? config.command.trim().replace(/^\//, '')
@@ -124,7 +140,25 @@ function resolveConfig(raw) {
   const allowedTools = Array.isArray(config.allowedTools)
     ? [...new Set(config.allowedTools.filter((entry) => typeof entry === 'string' && entry.trim() !== ''))]
     : [...DEFAULT_ALLOWED_TOOLS]
-  return { command, section, sectionOrder, allowedTools }
+  // Optional providers: the built-in map, plus any `{ "<plugin>": [tools] }`
+  // the row declares. Extra names are additive, so a user can adopt a
+  // read-only tool from another bundle without losing the defaults.
+  const optionalTools = new Map(
+    Object.entries(OPTIONAL_TOOL_PROVIDERS).map(([owner, tools]) => [owner, [...tools]]),
+  )
+  if (config.optionalTools !== undefined) {
+    if (config.optionalTools === null || typeof config.optionalTools !== 'object' || Array.isArray(config.optionalTools)) {
+      throw new Error('sage-mode: `optionalTools` must be a mapping of { "<plugin name>": [toolName, ...] }')
+    }
+    for (const [owner, tools] of Object.entries(config.optionalTools)) {
+      if (!Array.isArray(tools)) {
+        throw new Error(`sage-mode: optionalTools["${owner}"] must be an array of tool names`)
+      }
+      const names = tools.filter((entry) => typeof entry === 'string' && entry.trim() !== '')
+      optionalTools.set(owner, [...new Set([...(optionalTools.get(owner) ?? []), ...names])])
+    }
+  }
+  return { command, section, sectionOrder, allowedTools, optionalTools }
 }
 
 /** The `/sage off` spelling, case-insensitive and exact. */
@@ -218,6 +252,29 @@ export function apply(ctx, rawConfig) {
     return entry
   }
 
+  /**
+   * Resolve the allow list for one agent: configured tools plus every
+   * read-only tool whose optional provider is actually mounted.
+   *
+   * @param visibleSet - names the calling agent can currently see.
+   * @returns the admitted names and the optional owners that contributed.
+   */
+  const resolveAllowed = (visibleSet) => {
+    const allowed = config.allowedTools.filter((tool) => visibleSet.has(tool))
+    const present = []
+    const absent = []
+    for (const [owner, tools] of config.optionalTools) {
+      const adopted = tools.filter((tool) => visibleSet.has(tool))
+      if (adopted.length > 0) {
+        present.push(owner)
+        allowed.push(...adopted)
+      } else {
+        absent.push(owner)
+      }
+    }
+    return { allowed: [...new Set(allowed)], present, absent }
+  }
+
   /** Hide the mutating tools and deny anything else that still reaches dispatch. */
   const engage = (agent, entry) => {
     if (entry.lift !== undefined || entry.guard !== undefined) return
@@ -228,7 +285,14 @@ export function apply(ctx, rawConfig) {
     }
     const visible = visibleNames(agent)
     const visibleSet = new Set(visible)
-    const allowed = config.allowedTools.filter((tool) => visibleSet.has(tool))
+    const resolved = resolveAllowed(visibleSet)
+    const allowed = resolved.allowed
+    if (resolved.present.length > 0) {
+      report('info', `sage-mode: optional tool providers mounted: ${resolved.present.join(', ')}.`)
+    }
+    if (resolved.absent.length > 0) {
+      report('info', `sage-mode: optional tool providers not mounted, their tools are ignored: ${resolved.absent.join(', ')}.`)
+    }
     let filter
     if (allowed.length > 0) {
       entry.admitted = new Set([...allowed, PTC_TRANSPORT])

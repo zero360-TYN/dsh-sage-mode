@@ -39,24 +39,68 @@ by a `tools.guard()` that returns "let the user run `/sage off` first".
 ## Tools kept (default)
 
 `read` `read_image` `glob` `grep` `web_search` `web_fetch` `ask_user_question` `skill`
-`ops_glob` `ops_grep` `ops_inspect_local_file` `cordis_inspect_list` `cordis_inspect_query`
-`load_workspace_dependencies`
+`cordis_inspect_list` `cordis_inspect_query` `load_workspace_dependencies`
 
 Everything else is hidden — `write` `edit` `ops_replace`, `pwsh`/`bash` and background jobs,
 `subagent`/`send_message`, `plugin_manager`, `todo_write`, `present`, goal and team-task
 tools, and so on. Names that do not exist in your composition are ignored, so one list works
 across agent presets.
 
+## Reference
+
+### Optional dependency: dsh-ops
+
+The fast read-only tools — `ops_glob`, `ops_grep`, `ops_inspect_local_file` — come from
+**[dsh-ops](https://github.com/T-Auto/dsh-ops)**, a separate bundle. Sage mode declares them
+as an **optional dependency** (`optionalTools` in [`cordis.patch.yml`](cordis.patch.yml)):
+
+- **dsh-ops installed** → those tools are adopted into the allow list and stay available.
+- **dsh-ops absent** → the names are ignored and everything else keeps working. A missing
+  optional provider is never an error.
+
+This is deliberate: no package in this list provides a Cordis *service*, so `inject` cannot
+express "dsh-ops is present" — waiting on a service that does not exist would silently
+deactivate the plugin. The registered tool names are the observable fact, so the plugin
+resolves them per agent when the mode is engaged, and logs which providers were found.
+
+To adopt a read-only tool from any other bundle, extend the map without touching the code:
+
+```yaml
+config:
+  optionalTools:
+    some-other-plugin: [their_read_tool]
+```
+
+### Also see
+
+- [dsh-ops](https://github.com/T-Auto/dsh-ops) — the optional source of the `ops_*` tools.
+- [Sage mode repository](https://github.com/zero360-TYN/dsh-sage-mode) — this plugin.
+
 ## Install
 
-Install the bundle into your profile with the Plugin Manager, pointing at this directory:
+Open **Plugin Manager** in the Harness and enter this repository's URL as the install spec:
+
+```
+https://github.com/zero360-TYN/dsh-sage-mode
+```
+
+The manager reads a GitHub repository URL as a git install spec, clones the package, adds its
+`sage-mode` row, and activates it. Updating later means installing the same URL again; a fresh
+JavaScript module generation needs an app restart to load.
+
+<details>
+<summary>Alternative: install from a local directory</summary>
+
+From a checkout, point the manager at the absolute path instead:
 
 ```
 plugin_manager(action: "install_bundle", target: "<absolute path to this repo>")
 ```
 
-The bundle adds one Loader row, `sage-mode`, and the package is installed as a link — editing
-files in the repo affects the live plugin (a JavaScript change needs an app restart to load).
+That installs the package as a **link**, so editing files in the repo affects the live plugin
+directly — convenient while developing.
+
+</details>
 
 ## Configuration
 
@@ -71,6 +115,8 @@ the targeted row's **whole** `config`, so restate every key you want to keep:
     command: sage          # command name (default: sage)
     sectionOrder: 3255     # prompt section placement
     allowedTools: [read, grep, web_search]   # keep only these
+    optionalTools:         # optional deps: adopt their read-only tools when present
+      dsh-ops: [ops_glob, ops_grep, ops_inspect_local_file]
     section: |             # the full advisory prompt
       ...
 ```

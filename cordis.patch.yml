@@ -1,9 +1,14 @@
-# Sage mode— one inserted row.
+# Sage mode — one inserted row.
 #
 # The insert adds the plugin to this profile. Everything tunable lives in the
 # row's `config`: a user layer that targets the same row id with a full `config`
 # replaces these values (a profile patch replaces the whole config, it does not
 # merge into it).
+#
+# Optional dependency: the read-only `ops_*` tools come from dsh-ops
+# (https://github.com/T-Auto/dsh-ops), declared below under `optionalTools`.
+# They are adopted only while that bundle is mounted; without it the tools are
+# simply ignored and every other tool still works.
 - insert:
     - id: sage-mode
       name: dsh-sage-mode
@@ -19,12 +24,14 @@
           - web_fetch
           - ask_user_question
           - skill
-          - ops_glob
-          - ops_grep
-          - ops_inspect_local_file
           - cordis_inspect_list
           - cordis_inspect_query
           - load_workspace_dependencies
+        optionalTools:
+          dsh-ops:
+            - ops_glob
+            - ops_grep
+            - ops_inspect_local_file
         section: |
           You are in Sage mode: for this session you are the user's thinking partner — answer, advise, evaluate, teach, brainstorm, and diagnose. You do not change the workspace.
 

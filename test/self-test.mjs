@@ -160,15 +160,61 @@ test('/sage enters the mode: read-only tools stay, the rest are hidden', () => {
   const result = run(harness, agent, '')
 
   assert.equal(result.kind, 'success')
-  const entry = restriction(harness)
-  assert.deepEqual(entry.filter, { allow: [
+  const allow = restriction(harness).filter.allow
+  // Order is irrelevant to `restrict`; compare the resolved set.
+  assert.deepEqual([...allow].sort(), [
     'read', 'read_image', 'glob', 'grep', 'web_search', 'web_fetch',
     'ask_user_question', 'skill', 'ops_glob', 'ops_grep',
     'ops_inspect_local_file', 'cordis_inspect_list', 'cordis_inspect_query',
     'load_workspace_dependencies',
-  ] })
+  ].sort())
   assert.match(sectionText(harness), /Sage mode/)
   assert.equal(harness.record.steered.length, 0)
+})
+
+test('the optional dsh-ops tools are adopted when that bundle is mounted', () => {
+  const harness = createHarness()  // FULL_TOOLS includes the three ops_* names
+  apply(harness.ctx)
+  run(harness, harness.makeAgent(), '')
+
+  const allow = restriction(harness).filter.allow
+  for (const tool of ['ops_glob', 'ops_grep', 'ops_inspect_local_file']) {
+    assert.equal(allow.includes(tool), true, `${tool} should be adopted from dsh-ops`)
+  }
+})
+
+test('without dsh-ops the plugin still works and simply ignores its tools', () => {
+  // Same composition minus every ops_* name: an absent optional provider.
+  const harness = createHarness({
+    toolNames: FULL_TOOLS.filter((tool) => !tool.startsWith('ops_')),
+  })
+  apply(harness.ctx)
+  const result = run(harness, harness.makeAgent(), '')
+
+  assert.equal(result.kind, 'success', 'a missing optional provider must not break the mode')
+  const allow = restriction(harness).filter.allow
+  assert.equal(allow.some((tool) => tool.startsWith('ops_')), false)
+  assert.equal(allow.includes('read'), true, 'core read tools still work')
+  assert.equal(allow.includes('web_search'), true)
+  // The guard stays consistent with the resolved allow list.
+  const check = guard(harness).fn
+  assert.equal(check({ name: 'read' }), undefined)
+  assert.match(check({ name: 'ops_glob' }), /Sage mode/)
+})
+
+test('config.optionalTools can adopt a read-only tool from another bundle', () => {
+  const harness = createHarness({ toolNames: [...FULL_TOOLS, 'other_read_tool'] })
+  apply(harness.ctx, { optionalTools: { 'some-other-plugin': ['other_read_tool'] } })
+  run(harness, harness.makeAgent(), '')
+
+  assert.equal(restriction(harness).filter.allow.includes('other_read_tool'), true)
+})
+
+test('a malformed optionalTools value fails loudly at load', () => {
+  const { ctx } = createHarness()
+  assert.throws(() => apply(ctx, { optionalTools: ['ops_glob'] }), /optionalTools/)
+  const second = createHarness()
+  assert.throws(() => apply(second.ctx, { optionalTools: { 'dsh-ops': 'ops_glob' } }), /must be an array/)
 })
 
 test('the guard admits the allowed tools and denies mutation', () => {

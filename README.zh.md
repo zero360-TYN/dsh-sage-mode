@@ -34,23 +34,63 @@
 ## 保留的工具（默认）
 
 `read` `read_image` `glob` `grep` `web_search` `web_fetch` `ask_user_question` `skill`
-`ops_glob` `ops_grep` `ops_inspect_local_file` `cordis_inspect_list` `cordis_inspect_query`
-`load_workspace_dependencies`
+`cordis_inspect_list` `cordis_inspect_query` `load_workspace_dependencies`
 
 其余全部隐藏：`write` `edit` `ops_replace`、`pwsh`/`bash` 与后台任务、`subagent`/`send_message`、
 `plugin_manager`、`todo_write`、`present`、目标与团队任务工具等。
 清单里不存在的名字会被自动忽略，因此同一份配置适用于不同 preset。
 
+## 参考（Reference）
+
+### 可选依赖：dsh-ops
+
+三个高速只读工具 `ops_glob` `ops_grep` `ops_inspect_local_file` 来自独立的 bundle
+**[dsh-ops](https://github.com/T-Auto/dsh-ops)**。贤者模式把它们声明为**可选依赖**
+（[`cordis.patch.yml`](cordis.patch.yml) 里的 `optionalTools`）：
+
+- **装了 dsh-ops** → 这些工具被纳入白名单，保持可用。
+- **没装 dsh-ops** → 名字被忽略，其余功能完全不受影响。可选依赖缺失**从不算错误**。
+
+这是刻意的设计：这些包里**没有任何一个提供 Cordis 服务**，所以 `inject` 无法表达「dsh-ops 存在」——
+去等一个并不存在的服务，只会让插件静默失效。真正可观测的事实是**已注册的工具名**，
+因此插件在模式启用时按 agent 解析它们，并记录找到了哪些 provider。
+
+想引入其它 bundle 的只读工具，扩展这张表即可，无需改代码：
+
+```yaml
+config:
+  optionalTools:
+    some-other-plugin: [their_read_tool]
+```
+
+### 相关链接
+
+- [dsh-ops](https://github.com/T-Auto/dsh-ops) —— `ops_*` 工具的可选来源。
+- [贤者模式仓库](https://github.com/zero360-TYN/dsh-sage-mode) —— 本插件。
+
 ## 安装
 
-用 Plugin Manager 把这个 bundle 装进你的 profile，target 指向本仓库目录：
+打开 Harness 的**插件市场（Plugin Manager）**，把本仓库的 URL 填进安装框：
+
+```
+https://github.com/zero360-TYN/dsh-sage-mode
+```
+
+管理器会把 GitHub 仓库 URL 识别为 git 安装类型，克隆该包、加入 `sage-mode` 行并激活。
+以后更新就是重新填一次同样的 URL；新的 JavaScript 模块代际需要重启应用才会加载。
+
+<details>
+<summary>备选方式：从本地目录安装</summary>
+
+如果你有本地 checkout，把 target 改成绝对路径即可：
 
 ```
 plugin_manager(action: "install_bundle", target: "<本仓库的绝对路径>")
 ```
 
-bundle 只加一行 Loader 行 `sage-mode`，并以**链接**方式安装——改仓库里的文件就等于改运行中的插件
-（改 JavaScript 后需要重启应用才会重新加载模块）。
+这种方式以**链接**安装，改仓库文件就等于直接改运行中的插件——开发时更方便。
+
+</details>
 
 ## 定制
 
@@ -65,6 +105,8 @@ bundle 只加一行 Loader 行 `sage-mode`，并以**链接**方式安装——�
     command: sage          # 命令名（默认 sage）
     sectionOrder: 3255     # 提示词段落排序
     allowedTools: [read, grep, web_search]   # 只保留这些
+    optionalTools:         # 可选依赖：某插件在时才纳入它的只读工具
+      dsh-ops: [ops_glob, ops_grep, ops_inspect_local_file]
     section: |             # 顾问提示词全文
       ...
 ```
