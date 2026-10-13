@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": false,
   "type": "module",
-  "description": "Sage mode（贤者模式）: a user-toggled read-only advisory session mode — answers, advice, evaluation, teaching, brainstorming, and error analysis with read/search/web tools only.",
+  "description": "Sage mode: a user-toggled read-only advisory session mode — answers, advice, evaluation, teaching, brainstorming, and error analysis with read/search/web tools only.",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -20,7 +20,7 @@
   },
   "icon": "./icon.png",
   "meta": {
-    "title": "Sage Mode · 贤者模式",
+    "title": "Sage Mode",
     "description": "A read-only advisory mode: /sage turns the session into advice, review, and Q&A with only read, search, and web tools; /sage off restores the full toolset."
   },
   "dsh": {
